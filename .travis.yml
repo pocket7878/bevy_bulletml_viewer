@@ -1,0 +1,13 @@
+language: rust
+matrix:
+  include:
+    - rust: stable
+    - rust: beta
+    - rust: nightly
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
+script:
+    - if [ "$TRAVIS_TAG" ]; then export CARGO_OPTIONS="${CARGO_OPTIONS} --release"; fi
+    - cargo build --verbose $CARGO_OPTIONS
+    - cargo test --verbose $CARGO_OPTIONS

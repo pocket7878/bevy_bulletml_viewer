@@ -1,0 +1,10 @@
+[package]
+name = "bulletml_viewer_rs"
+version = "0.1.0"
+authors = ["Arnaud de Bossoreille <arnaud.debossoreille@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+bulletml = { git = "https://github.com/arnodb/bulletml_rs.git" }
+piston_window = "0.106"
+rand = "0.7"
