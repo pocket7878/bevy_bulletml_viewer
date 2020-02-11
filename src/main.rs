@@ -176,7 +176,8 @@ fn main() {
             runners.push(Runner::new(
                 BulletMLViewerRunner {
                     pos: data.enemy_pos,
-                    direction: get_direction(data.enemy_pos, data.ship_pos),
+                    direction: get_direction(data.enemy_pos, data.ship_pos) * 180.
+                        / std::f64::consts::PI,
                     speed: 0.,
                     vanished: false,
                     new_runners: Vec::default(),
