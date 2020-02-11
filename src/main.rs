@@ -12,7 +12,7 @@ struct Pos {
 }
 
 fn get_direction(from: Pos, to: Pos) -> f64 {
-    f64::atan((to.x - from.x) / (to.y - from.y))
+    f64::atan2(to.x - from.x, to.y - from.y)
 }
 
 struct BulletMLViewerRunner {
@@ -46,7 +46,7 @@ impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
     }
 
     fn get_aim_direction(&self, data: &BulletMLViewerRunnerData) -> f64 {
-        get_direction(self.pos, data.ship_pos)
+        get_direction(self.pos, data.ship_pos) * 180. / std::f64::consts::PI
     }
 
     fn get_bullet_speed(&self, _data: &BulletMLViewerRunnerData) -> f64 {
@@ -58,7 +58,7 @@ impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
     }
 
     fn get_rank(&self, _data: &BulletMLViewerRunnerData) -> f64 {
-        0.
+        0.5
     }
 
     fn create_simple_bullet(
@@ -72,7 +72,7 @@ impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
         }
         let runner = Runner::new(
             BulletMLViewerRunner {
-                pos: data.enemy_pos,
+                pos: self.pos,
                 direction,
                 speed,
                 vanished: false,
@@ -96,7 +96,7 @@ impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
         }
         let runner = Runner::new_from_state(
             BulletMLViewerRunner {
-                pos: data.enemy_pos,
+                pos: self.pos,
                 direction: direction,
                 speed: speed,
                 vanished: false,
@@ -236,5 +236,12 @@ fn main() {
             data.available_slots = MAX_BULLETS - runners.len();
             data.turn += 1;
         }
+
+        event.mouse_cursor(|pos| {
+            data.ship_pos = Pos {
+                x: pos[0],
+                y: pos[1],
+            };
+        });
     }
 }
