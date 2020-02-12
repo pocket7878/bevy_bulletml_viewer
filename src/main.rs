@@ -12,7 +12,7 @@ struct Pos {
 }
 
 fn get_direction(from: Pos, to: Pos) -> f64 {
-    f64::atan2(to.x - from.x, to.y - from.y)
+    f64::atan2(to.x - from.x, from.y - to.y)
 }
 
 struct BulletMLViewerRunner {
@@ -26,7 +26,7 @@ struct BulletMLViewerRunner {
 impl BulletMLViewerRunner {
     fn mov(&mut self) {
         self.pos.x += f64::sin(self.direction * std::f64::consts::PI / 180.) * self.speed;
-        self.pos.y += f64::cos(self.direction * std::f64::consts::PI / 180.) * self.speed;
+        self.pos.y -= f64::cos(self.direction * std::f64::consts::PI / 180.) * self.speed;
     }
 }
 
