@@ -165,8 +165,8 @@ fn main() {
             duration.as_secs() * 1000 + u64::from(duration.subsec_millis())
         };
 
-        let frame = (now_millis - prev_millis) / 16;
-        prev_millis += frame * 16;
+        let frame = (now_millis - prev_millis) / 10;
+        prev_millis += frame * 10;
 
         if runners.is_empty() && bullets.is_empty() {
             runners.push(Runner::new(
