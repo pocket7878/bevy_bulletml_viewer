@@ -1,5 +1,5 @@
 use bulletml::parse::BulletMLParser;
-use bulletml::{AppRunner, BulletML, Runner, RunnerData, State};
+use bulletml::{AppRunner, Runner, RunnerData, State};
 use piston_window::*;
 use rand::Rng;
 use std::env;
@@ -15,42 +15,50 @@ fn get_direction(from: Pos, to: Pos) -> f64 {
     f64::atan2(to.x - from.x, from.y - to.y)
 }
 
-struct BulletMLViewerRunner {
+struct Bullet {
     pos: Pos,
     direction: f64,
     speed: f64,
-    vanished: bool,
-    new_runners: Vec<Runner<BulletMLViewerRunner>>,
 }
 
-impl BulletMLViewerRunner {
+impl Bullet {
     fn mov(&mut self) {
         self.pos.x += f64::sin(self.direction * std::f64::consts::PI / 180.) * self.speed;
         self.pos.y -= f64::cos(self.direction * std::f64::consts::PI / 180.) * self.speed;
     }
+
+    fn is_out_of_bounds(&self) -> bool {
+        self.pos.x < 0.
+            || self.pos.y < 0.
+            || self.pos.x > WIDTH as f64
+            || self.pos.y >= HEIGHT as f64
+    }
 }
 
-const MAX_BULLETS: usize = 2000;
+struct BulletMLViewerRunner {
+    bullet: Bullet,
+    vanished: bool,
+    new_runners: Vec<Runner<BulletMLViewerRunner>>,
+    new_bullets: Vec<Bullet>,
+}
 
-struct BulletMLViewerRunnerData<'a> {
+struct BulletMLViewerRunnerData {
     turn: u32,
     enemy_pos: Pos,
     ship_pos: Pos,
-    bml: &'a BulletML,
-    available_slots: usize,
 }
 
-impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
+impl AppRunner<BulletMLViewerRunnerData> for BulletMLViewerRunner {
     fn get_bullet_direction(&self, _data: &BulletMLViewerRunnerData) -> f64 {
-        self.direction
+        self.bullet.direction
     }
 
     fn get_aim_direction(&self, data: &BulletMLViewerRunnerData) -> f64 {
-        get_direction(self.pos, data.ship_pos) * 180. / std::f64::consts::PI
+        get_direction(self.bullet.pos, data.ship_pos) * 180. / std::f64::consts::PI
     }
 
     fn get_bullet_speed(&self, _data: &BulletMLViewerRunnerData) -> f64 {
-        self.speed
+        self.bullet.speed
     }
 
     fn get_default_speed(&self) -> f64 {
@@ -63,49 +71,38 @@ impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
 
     fn create_simple_bullet(
         &mut self,
-        data: &mut BulletMLViewerRunnerData,
+        _data: &mut BulletMLViewerRunnerData,
         direction: f64,
         speed: f64,
     ) {
-        if data.available_slots == 0 {
-            return;
-        }
-        let runner = Runner::new(
-            BulletMLViewerRunner {
-                pos: self.pos,
-                direction,
-                speed,
-                vanished: false,
-                new_runners: Vec::default(),
-            },
-            data.bml,
-        );
-        self.new_runners.push(runner);
-        data.available_slots -= 1;
+        self.new_bullets.push(Bullet {
+            pos: self.bullet.pos,
+            direction: direction,
+            speed: speed,
+        });
     }
 
     fn create_bullet(
         &mut self,
-        data: &mut BulletMLViewerRunnerData,
+        _data: &mut BulletMLViewerRunnerData,
         state: State,
         direction: f64,
         speed: f64,
     ) {
-        if data.available_slots == 0 {
-            return;
-        }
         let runner = Runner::new_from_state(
             BulletMLViewerRunner {
-                pos: self.pos,
-                direction: direction,
-                speed: speed,
+                bullet: Bullet {
+                    pos: self.bullet.pos,
+                    direction: direction,
+                    speed: speed,
+                },
                 vanished: false,
                 new_runners: Vec::default(),
+                new_bullets: Vec::default(),
             },
             state,
         );
         self.new_runners.push(runner);
-        data.available_slots -= 1;
     }
 
     fn get_turn(&self, data: &BulletMLViewerRunnerData) -> u32 {
@@ -117,11 +114,11 @@ impl<'a> AppRunner<BulletMLViewerRunnerData<'a>> for BulletMLViewerRunner {
     }
 
     fn do_change_direction(&mut self, _data: &mut BulletMLViewerRunnerData, direction: f64) {
-        self.direction = direction;
+        self.bullet.direction = direction;
     }
 
     fn do_change_speed(&mut self, _data: &mut BulletMLViewerRunnerData, speed: f64) {
-        self.speed = speed;
+        self.bullet.speed = speed;
     }
 
     fn get_rand(&self, _data: &mut BulletMLViewerRunnerData) -> f64 {
@@ -150,11 +147,10 @@ fn main() {
             x: WIDTH as f64 / 2.,
             y: HEIGHT as f64 * 0.9,
         },
-        bml: &bml,
-        available_slots: MAX_BULLETS,
     };
 
     let mut runners = Vec::new();
+    let mut bullets = Vec::<Bullet>::new();
 
     let start_time = Instant::now();
     let mut prev_millis = 0;
@@ -172,19 +168,21 @@ fn main() {
         let frame = (now_millis - prev_millis) / 16;
         prev_millis += frame * 16;
 
-        if runners.is_empty() {
+        if runners.is_empty() && bullets.is_empty() {
             runners.push(Runner::new(
                 BulletMLViewerRunner {
-                    pos: data.enemy_pos,
-                    direction: get_direction(data.enemy_pos, data.ship_pos) * 180.
-                        / std::f64::consts::PI,
-                    speed: 0.,
-                    vanished: false,
+                    bullet: Bullet {
+                        pos: data.enemy_pos,
+                        direction: get_direction(data.enemy_pos, data.ship_pos) * 180.
+                            / std::f64::consts::PI,
+                        speed: 0.,
+                    },
+                    vanished: true,
                     new_runners: Vec::default(),
+                    new_bullets: Vec::default(),
                 },
                 &bml,
             ));
-            data.available_slots -= 1;
         }
 
         window.draw_2d(&event, |context, graphics, _device| {
@@ -203,38 +201,53 @@ fn main() {
             );
             for runner in &runners {
                 if !runner.vanished && !runner.is_end() {
+                    let bullet = &runner.bullet;
                     rectangle(
                         [1.0, 1.0, 0.0, 1.0],
-                        [runner.pos.x - 2., runner.pos.y - 2., 4., 4.],
+                        [bullet.pos.x - 2., bullet.pos.y - 2., 4., 4.],
                         context.transform,
                         graphics,
                     );
                 }
             }
+            for bullet in &bullets {
+                rectangle(
+                    [1.0, 1.0, 0.0, 1.0],
+                    [bullet.pos.x - 2., bullet.pos.y - 2., 4., 4.],
+                    context.transform,
+                    graphics,
+                );
+            }
         });
 
         for _ in 0..frame {
             let mut new_runners = Vec::new();
+            let mut new_bullets = Vec::new();
             for runner in &mut runners {
-                runner.mov();
+                runner.bullet.mov();
                 runner.run(&mut RunnerData {
                     bml: &bml,
                     data: &mut data,
                 });
                 new_runners.extend(&mut runner.new_runners.drain(..));
+                new_bullets.extend(&mut runner.new_bullets.drain(..));
             }
-            runners.retain(|runner| {
-                let out_of_bounds = runner.pos.x < 0.
-                    || runner.pos.y < 0.
-                    || runner.pos.x > WIDTH as f64
-                    || runner.pos.y >= HEIGHT as f64;
-                !runner.vanished && !runner.is_end() && !out_of_bounds
-            });
+            for bullet in &mut bullets {
+                bullet.mov();
+            }
+
+            runners.retain(|runner| !runner.is_end() && !runner.bullet.is_out_of_bounds());
             runners.reserve(new_runners.len());
             for runner in new_runners.drain(..) {
                 runners.push(runner);
             }
-            data.available_slots = MAX_BULLETS - runners.len();
+
+            bullets.retain(|bullet| !bullet.is_out_of_bounds());
+            bullets.reserve(new_bullets.len());
+            for runner in new_bullets.drain(..) {
+                bullets.push(runner);
+            }
+
             data.turn += 1;
         }
 
