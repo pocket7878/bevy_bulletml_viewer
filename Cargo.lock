@@ -98,7 +98,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bulletml_viewer_rs"
+name = "bulletml_viewer"
 version = "0.1.0"
 dependencies = [
  "bulletml 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
