@@ -77,8 +77,8 @@ impl AppRunner<BulletMLViewerRunnerData> for BulletMLViewerRunner {
     ) {
         self.new_bullets.push(Bullet {
             pos: self.bullet.pos,
-            direction: direction,
-            speed: speed,
+            direction,
+            speed,
         });
     }
 
@@ -93,8 +93,8 @@ impl AppRunner<BulletMLViewerRunnerData> for BulletMLViewerRunner {
             BulletMLViewerRunner {
                 bullet: Bullet {
                     pos: self.bullet.pos,
-                    direction: direction,
-                    speed: speed,
+                    direction,
+                    speed,
                 },
                 vanished: false,
                 new_runners: Vec::default(),
