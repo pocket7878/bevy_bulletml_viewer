@@ -1,14 +1,18 @@
 [package]
-name = "bulletml_viewer"
-version = "0.1.1"
-authors = ["Arnaud de Bossoreille <arnaud.debossoreille@gmail.com>"]
-edition = "2018"
-license-file = "LICENSE"
+authors = [
+  "Arnaud de Bossoreille <arnaud.debossoreille@gmail.com>",
+  "Pocket7878 <poketo7878@gmail.com>",
+]
 description = "BulletML viewer in Rust"
 documentation = "https://docs.rs/bulletml_viewer"
-repository = "https://github.com/arnodb/bulletml_viewer_rs"
+edition = "2021"
+license-file = "LICENSE"
+name = "bulletml_viewer"
+repository = "https://github.com/pocket7878/bulletml_viewer_rs"
+version = "0.1.1"
 
 [dependencies]
-bulletml = "0.2"
-piston_window = "0.107"
+bevy = "0.6.0"
+bevy_bulletml = {git = "https://github.com/pocket7878/bevy_bulletml"}
+once_cell = "1.9"
 rand = "0.7"

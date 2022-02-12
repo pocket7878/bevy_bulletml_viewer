@@ -1,261 +1,167 @@
-use bulletml::parse::BulletMLParser;
-use bulletml::{AppRunner, Runner, RunnerData, State};
-use piston_window::*;
-use rand::Rng;
+mod app_runner;
+mod bml_manager;
+mod bullet;
+mod bullet_type;
+mod math_util;
+
+use app_runner::{BulletMLViewerRunner, BulletMLViewerRunnerData};
+use bevy::prelude::*;
+use bevy_bulletml::{Runner, RunnerData};
+use bml_manager::BMLManager;
+use bullet::Bullet;
+use bullet_type::BulletType;
+use once_cell::sync::Lazy;
 use std::env;
-use std::time::Instant;
-
-#[derive(Debug, Clone, Copy)]
-struct Pos {
-    x: f64,
-    y: f64,
-}
-
-fn get_direction(from: Pos, to: Pos) -> f64 {
-    f64::atan2(to.x - from.x, from.y - to.y)
-}
-
-struct Bullet {
-    pos: Pos,
-    direction: f64,
-    speed: f64,
-}
-
-impl Bullet {
-    fn mov(&mut self) {
-        self.pos.x += f64::sin(self.direction * std::f64::consts::PI / 180.) * self.speed;
-        self.pos.y -= f64::cos(self.direction * std::f64::consts::PI / 180.) * self.speed;
-    }
-
-    fn is_out_of_bounds(&self) -> bool {
-        self.pos.x < 0.
-            || self.pos.y < 0.
-            || self.pos.x > WIDTH as f64
-            || self.pos.y >= HEIGHT as f64
-    }
-}
-
-struct BulletMLViewerRunner {
-    bullet: Bullet,
-    vanished: bool,
-    new_runners: Vec<Runner<BulletMLViewerRunner>>,
-    new_bullets: Vec<Bullet>,
-}
-
-struct BulletMLViewerRunnerData {
-    turn: u32,
-    enemy_pos: Pos,
-    ship_pos: Pos,
-}
-
-impl AppRunner<BulletMLViewerRunnerData> for BulletMLViewerRunner {
-    fn get_bullet_direction(&self, _data: &BulletMLViewerRunnerData) -> f64 {
-        self.bullet.direction
-    }
-
-    fn get_aim_direction(&self, data: &BulletMLViewerRunnerData) -> f64 {
-        get_direction(self.bullet.pos, data.ship_pos) * 180. / std::f64::consts::PI
-    }
-
-    fn get_bullet_speed(&self, _data: &BulletMLViewerRunnerData) -> f64 {
-        self.bullet.speed
-    }
-
-    fn get_default_speed(&self) -> f64 {
-        1.
-    }
-
-    fn get_rank(&self, _data: &BulletMLViewerRunnerData) -> f64 {
-        0.5
-    }
-
-    fn create_simple_bullet(
-        &mut self,
-        _data: &mut BulletMLViewerRunnerData,
-        direction: f64,
-        speed: f64,
-    ) {
-        self.new_bullets.push(Bullet {
-            pos: self.bullet.pos,
-            direction,
-            speed,
-        });
-    }
-
-    fn create_bullet(
-        &mut self,
-        _data: &mut BulletMLViewerRunnerData,
-        state: State,
-        direction: f64,
-        speed: f64,
-    ) {
-        let runner = Runner::new_from_state(
-            BulletMLViewerRunner {
-                bullet: Bullet {
-                    pos: self.bullet.pos,
-                    direction,
-                    speed,
-                },
-                vanished: false,
-                new_runners: Vec::default(),
-                new_bullets: Vec::default(),
-            },
-            state,
-        );
-        self.new_runners.push(runner);
-    }
-
-    fn get_turn(&self, data: &BulletMLViewerRunnerData) -> u32 {
-        data.turn
-    }
-
-    fn do_vanish(&mut self, _data: &mut BulletMLViewerRunnerData) {
-        self.vanished = true;
-    }
-
-    fn do_change_direction(&mut self, _data: &mut BulletMLViewerRunnerData, direction: f64) {
-        self.bullet.direction = direction;
-    }
-
-    fn do_change_speed(&mut self, _data: &mut BulletMLViewerRunnerData, speed: f64) {
-        self.bullet.speed = speed;
-    }
-
-    fn get_rand(&self, _data: &mut BulletMLViewerRunnerData) -> f64 {
-        rand::thread_rng().gen()
-    }
-}
 
 const WIDTH: u32 = 640;
 const HEIGHT: u32 = 480;
+static ENEMY_POSITION: Lazy<Vec3> = Lazy::new(|| Vec3::new(0., HEIGHT as f32 / 2. * 0.7, 0.0));
+static INITIAL_SHIP_POSITION: Lazy<Vec3> =
+    Lazy::new(|| Vec3::new(0., -(HEIGHT as f32 / 2. * 0.7), 0.0));
+
+#[derive(Component)]
+struct BulletFrameTimer(Timer);
+
+impl Default for BulletFrameTimer {
+    fn default() -> Self {
+        Self(Timer::from_seconds(1.0 / 60.0, true)) // 60fps
+    }
+}
+
+#[derive(Component)]
+struct Ship;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let bml_file = &args[1];
 
-    let bml = BulletMLParser::with_capacities(0, 128)
-        .parse_file(bml_file)
-        .unwrap();
+    let bml_manager = BMLManager::new(bml_file.to_string());
+    let top_data = BulletMLViewerRunnerData { turn: 0 };
 
-    let mut data = BulletMLViewerRunnerData {
-        turn: 0,
-        enemy_pos: Pos {
-            x: WIDTH as f64 / 2.,
-            y: HEIGHT as f64 * 0.3,
-        },
-        ship_pos: Pos {
-            x: WIDTH as f64 / 2.,
-            y: HEIGHT as f64 * 0.9,
-        },
-    };
+    App::new()
+        .insert_resource(WindowDescriptor {
+            title: "BulletML Viewer".to_string(),
+            width: WIDTH as f32,
+            height: HEIGHT as f32,
+            resizable: false,
+            ..Default::default()
+        })
+        .add_plugins(DefaultPlugins)
+        .insert_resource(bml_manager)
+        .insert_resource(BulletFrameTimer::default())
+        .insert_resource(top_data)
+        .add_startup_system(setup)
+        .add_system(update_bullet_system)
+        .add_system(despwan_bullet_system)
+        .run();
+}
 
-    let mut runners = Vec::new();
-    let mut bullets = Vec::<Bullet>::new();
+fn setup(bml_manager: Res<BMLManager>, mut commands: Commands) {
+    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn_bundle(UiCameraBundle::default());
+    /* Spawn enemy */
+    let runner = Runner::new(BulletMLViewerRunner, &bml_manager.bml);
+    commands
+        .spawn_bundle(SpriteBundle {
+            transform: Transform {
+                translation: *ENEMY_POSITION,
+                scale: Vec3::new(10.0, 10.0, 10.0),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                color: Color::rgb(1.0, 0.0, 0.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Bullet {
+            direction: math_util::get_direction(&ENEMY_POSITION, &INITIAL_SHIP_POSITION) * 180.
+                / std::f64::consts::PI,
+            speed: 0.,
+            vanished: true,
+        })
+        .insert(BulletType::WithRunner(runner));
 
-    let start_time = Instant::now();
-    let mut prev_millis = 0;
+    /* Spawn ship */
+    commands
+        .spawn_bundle(SpriteBundle {
+            transform: Transform {
+                translation: *INITIAL_SHIP_POSITION,
+                scale: Vec3::new(10.0, 10.0, 10.0),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                color: Color::rgb(0.0, 1.0, 0.0),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Ship);
+}
 
-    let mut window: PistonWindow = WindowSettings::new("BulletML Viewer", [WIDTH, HEIGHT])
-        .exit_on_esc(true)
-        .build()
-        .unwrap();
-    while let Some(event) = window.next() {
-        let now_millis = {
-            let duration = Instant::now().duration_since(start_time);
-            duration.as_secs() * 1000 + u64::from(duration.subsec_millis())
-        };
+fn update_bullet_system(
+    mut commands: Commands,
+    mut runner_data: ResMut<BulletMLViewerRunnerData>,
+    bml_manager: Res<BMLManager>,
+    time: Res<Time>,
+    mut timer: ResMut<BulletFrameTimer>,
+    mut bullet_query: Query<(&mut Bullet, &mut Transform, &mut BulletType), Without<Ship>>,
+    ship_query: Query<(&Ship, &Transform), Without<Bullet>>,
+) {
+    if !timer.0.tick(time.delta()).just_finished() {
+        return;
+    }
 
-        let frame = (now_millis - prev_millis) / 10;
-        prev_millis += frame * 10;
-
-        if runners.is_empty() && bullets.is_empty() {
-            runners.push(Runner::new(
-                BulletMLViewerRunner {
-                    bullet: Bullet {
-                        pos: data.enemy_pos,
-                        direction: get_direction(data.enemy_pos, data.ship_pos) * 180.
-                            / std::f64::consts::PI,
-                        speed: 0.,
-                    },
-                    vanished: true,
-                    new_runners: Vec::default(),
-                    new_bullets: Vec::default(),
-                },
-                &bml,
-            ));
-        }
-
-        window.draw_2d(&event, |context, graphics, _device| {
-            clear([0.0, 0.0, 0.0, 1.0], graphics);
-            rectangle(
-                [1.0, 0.0, 0.0, 1.0],
-                [data.enemy_pos.x - 4., data.enemy_pos.y - 4., 8., 8.],
-                context.transform,
-                graphics,
-            );
-            rectangle(
-                [0.0, 1.0, 0.0, 1.0],
-                [data.ship_pos.x - 4., data.ship_pos.y - 4., 8., 8.],
-                context.transform,
-                graphics,
-            );
-            for runner in &runners {
-                if !runner.vanished && !runner.is_end() {
-                    let bullet = &runner.bullet;
-                    rectangle(
-                        [1.0, 1.0, 0.0, 1.0],
-                        [bullet.pos.x - 2., bullet.pos.y - 2., 4., 4.],
-                        context.transform,
-                        graphics,
-                    );
-                }
+    let (_, player_transform) = ship_query.single();
+    for (mut bullet, mut transform, mut bullet_type) in &mut bullet_query.iter_mut() {
+        match *bullet_type {
+            BulletType::Simple => {
+                bullet.update(&mut transform);
             }
-            for bullet in &bullets {
-                rectangle(
-                    [1.0, 1.0, 0.0, 1.0],
-                    [bullet.pos.x - 2., bullet.pos.y - 2., 4., 4.],
-                    context.transform,
-                    graphics,
+            BulletType::WithRunner(ref mut runner) => {
+                bullet.update(&mut transform);
+                runner.run(
+                    &mut RunnerData {
+                        bml: &bml_manager.bml,
+                        data: &mut runner_data,
+                    },
+                    &mut bullet,
+                    &transform,
+                    &player_transform,
+                    &mut commands,
                 );
             }
-        });
-
-        for _ in 0..frame {
-            let mut new_runners = Vec::new();
-            let mut new_bullets = Vec::new();
-            for runner in &mut runners {
-                runner.bullet.mov();
-                runner.run(&mut RunnerData {
-                    bml: &bml,
-                    data: &mut data,
-                });
-                new_runners.extend(&mut runner.new_runners.drain(..));
-                new_bullets.extend(&mut runner.new_bullets.drain(..));
-            }
-            for bullet in &mut bullets {
-                bullet.mov();
-            }
-
-            runners.retain(|runner| !runner.is_end() && !runner.bullet.is_out_of_bounds());
-            runners.reserve(new_runners.len());
-            for runner in new_runners.drain(..) {
-                runners.push(runner);
-            }
-
-            bullets.retain(|bullet| !bullet.is_out_of_bounds());
-            bullets.reserve(new_bullets.len());
-            for runner in new_bullets.drain(..) {
-                bullets.push(runner);
-            }
-
-            data.turn += 1;
         }
-
-        event.mouse_cursor(|pos| {
-            data.ship_pos = Pos {
-                x: pos[0],
-                y: pos[1],
-            };
-        });
     }
+
+    runner_data.turn += 1;
+}
+
+fn despwan_bullet_system(
+    mut commands: Commands,
+    query: Query<(Entity, &Transform, &BulletType), With<Bullet>>,
+) {
+    for (entity, transform, bullet_type) in query.iter() {
+        match *bullet_type {
+            BulletType::Simple => {
+                if outside_check(&transform.translation) {
+                    commands.entity(entity).despawn();
+                }
+            }
+            BulletType::WithRunner(ref runner) => {
+                if outside_check(&transform.translation) && runner.is_end() {
+                    commands.entity(entity).despawn();
+                }
+            }
+        }
+    }
+}
+
+fn outside_check(translation: &Vec3) -> bool {
+    let max_x = WIDTH as f32 / 2.0;
+    let min_x = -max_x;
+    let max_y = HEIGHT as f32 / 2.0;
+    let min_y = -max_y;
+
+    translation.x > max_x || translation.x < min_x || translation.y > max_y || translation.y < min_y
 }
