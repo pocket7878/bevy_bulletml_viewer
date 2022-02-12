@@ -14,13 +14,4 @@ impl Bullet {
         transform.translation.y +=
             (f64::cos(self.direction * std::f64::consts::PI / 180.) * self.speed) as f32;
     }
-
-    /*
-    fn is_out_of_bounds(&self) -> bool {
-            self.pos.x < 0.
-                    || self.pos.y < 0.
-                    || self.pos.x > WIDTH as f64
-                    || self.pos.y >= HEIGHT as f64
-    }
-    */
 }
