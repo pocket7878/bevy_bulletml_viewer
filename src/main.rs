@@ -121,8 +121,8 @@ fn update_bullet_system(
                 runner.run(
                     &mut runner_data,
                     &mut bullet,
-                    &transform,
-                    &player_transform,
+                    &transform.translation,
+                    &player_transform.translation,
                     &mut commands,
                 );
             }

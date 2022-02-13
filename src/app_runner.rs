@@ -19,11 +19,10 @@ impl AppRunner<BulletMLViewerRunnerData, Bullet> for BulletMLViewerRunner {
     fn get_aim_direction(
         &self,
         _data: &BulletMLViewerRunnerData,
-        bullet_transform: &Transform,
-        target_transform: &Transform,
+        bullet_position: &Vec3,
+        target_position: &Vec3,
     ) -> f64 {
-        get_direction(&bullet_transform.translation, &target_transform.translation) * 180.
-            / std::f64::consts::PI
+        get_direction(&bullet_position, &target_position) * 180. / std::f64::consts::PI
     }
 
     fn get_bullet_speed(&self, _data: &BulletMLViewerRunnerData, bullet: &Bullet) -> f64 {
@@ -43,13 +42,13 @@ impl AppRunner<BulletMLViewerRunnerData, Bullet> for BulletMLViewerRunner {
         _data: &mut BulletMLViewerRunnerData,
         direction: f64,
         speed: f64,
-        bullet_transform: &Transform,
+        bullet_position: &Vec3,
         commands: &mut Commands,
     ) {
         commands
             .spawn_bundle(SpriteBundle {
                 transform: Transform {
-                    translation: bullet_transform.translation,
+                    translation: bullet_position.clone(),
                     scale: Vec3::new(5.0, 5.0, 5.0),
                     ..Default::default()
                 },
@@ -73,14 +72,14 @@ impl AppRunner<BulletMLViewerRunnerData, Bullet> for BulletMLViewerRunner {
         state: State,
         direction: f64,
         speed: f64,
-        bullet_transform: &Transform,
+        bullet_position: &Vec3,
         commands: &mut Commands,
     ) {
         let runner = Runner::new_from_state(BulletMLViewerRunner, state);
         commands
             .spawn_bundle(SpriteBundle {
                 transform: Transform {
-                    translation: bullet_transform.translation,
+                    translation: bullet_position.clone(),
                     scale: Vec3::new(5.0, 5.0, 5.0),
                     ..Default::default()
                 },
