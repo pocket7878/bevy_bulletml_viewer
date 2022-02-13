@@ -1,13 +1,11 @@
 mod app_runner;
-mod bml_manager;
 mod bullet;
 mod bullet_type;
 mod math_util;
 
 use app_runner::{BulletMLViewerRunner, BulletMLViewerRunnerData};
 use bevy::prelude::*;
-use bevy_bulletml::{Runner, RunnerData};
-use bml_manager::BMLManager;
+use bevy_bulletml::{BulletMLServer, Runner};
 use bullet::Bullet;
 use bullet_type::BulletType;
 use once_cell::sync::Lazy;
@@ -35,7 +33,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let bml_file = &args[1];
 
-    let bml_manager = BMLManager::new(bml_file.to_string());
+    let mut bml_server = BulletMLServer::new();
+    bml_server.load_file("sample", bml_file).unwrap();
     let top_data = BulletMLViewerRunnerData { turn: 0 };
 
     App::new()
@@ -47,7 +46,7 @@ fn main() {
             ..Default::default()
         })
         .add_plugins(DefaultPlugins)
-        .insert_resource(bml_manager)
+        .insert_resource(bml_server)
         .insert_resource(BulletFrameTimer::default())
         .insert_resource(top_data)
         .add_startup_system(setup)
@@ -56,11 +55,11 @@ fn main() {
         .run();
 }
 
-fn setup(bml_manager: Res<BMLManager>, mut commands: Commands) {
+fn setup(bml_server: Res<BulletMLServer>, mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     commands.spawn_bundle(UiCameraBundle::default());
     /* Spawn enemy */
-    let runner = Runner::new(BulletMLViewerRunner, &bml_manager.bml);
+    let runner = Runner::new(BulletMLViewerRunner, bml_server.get("sample").unwrap());
     commands
         .spawn_bundle(SpriteBundle {
             transform: Transform {
@@ -102,7 +101,6 @@ fn setup(bml_manager: Res<BMLManager>, mut commands: Commands) {
 fn update_bullet_system(
     mut commands: Commands,
     mut runner_data: ResMut<BulletMLViewerRunnerData>,
-    bml_manager: Res<BMLManager>,
     time: Res<Time>,
     mut timer: ResMut<BulletFrameTimer>,
     mut bullet_query: Query<(&mut Bullet, &mut Transform, &mut BulletType), Without<Ship>>,
@@ -121,10 +119,7 @@ fn update_bullet_system(
             BulletType::WithRunner(ref mut runner) => {
                 bullet.update(&mut transform);
                 runner.run(
-                    &mut RunnerData {
-                        bml: &bml_manager.bml,
-                        data: &mut runner_data,
-                    },
+                    &mut runner_data,
                     &mut bullet,
                     &transform,
                     &player_transform,

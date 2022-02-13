@@ -253,9 +253,11 @@ dependencies = [
 
 [[package]]
 name = "bevy_bulletml"
-version = "0.2.1"
-source = "git+https://github.com/pocket7878/bevy_bulletml#727579f06612f5f5e4baf230478df19bd73e0fac"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97a16132af56ddc5ba60821882b7b814fd1646e5433ba8859039dc1900d686ac"
 dependencies = [
+ "anyhow",
  "bevy",
  "derive-new",
  "fasteval",
@@ -788,6 +790,7 @@ checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 name = "bulletml_viewer"
 version = "0.1.1"
 dependencies = [
+ "anyhow",
  "bevy",
  "bevy_bulletml",
  "once_cell",

@@ -12,7 +12,8 @@ repository = "https://github.com/pocket7878/bulletml_viewer_rs"
 version = "0.1.1"
 
 [dependencies]
+anyhow = "1.0"
 bevy = "0.6.0"
-bevy_bulletml = {git = "https://github.com/pocket7878/bevy_bulletml"}
+bevy_bulletml = "0.2.0"
 once_cell = "1.9"
 rand = "0.7"
