@@ -11,11 +11,10 @@ use bullet_type::BulletType;
 use once_cell::sync::Lazy;
 use std::env;
 
-const WIDTH: u32 = 640;
-const HEIGHT: u32 = 480;
-static ENEMY_POSITION: Lazy<Vec3> = Lazy::new(|| Vec3::new(0., HEIGHT as f32 / 2. * 0.7, 0.0));
-static INITIAL_SHIP_POSITION: Lazy<Vec3> =
-    Lazy::new(|| Vec3::new(0., -(HEIGHT as f32 / 2. * 0.7), 0.0));
+const WIDTH: f32 = 640.;
+const HEIGHT: f32 = 480.;
+static ENEMY_POSITION: Lazy<Vec3> = Lazy::new(|| Vec3::new(0., HEIGHT / 2. * 0.7, 0.0));
+static INITIAL_SHIP_POSITION: Lazy<Vec3> = Lazy::new(|| Vec3::new(0., -(HEIGHT / 2. * 0.7), 0.0));
 
 #[derive(Component)]
 struct BulletFrameTimer(Timer);
@@ -40,8 +39,8 @@ fn main() {
     App::new()
         .insert_resource(WindowDescriptor {
             title: "BulletML Viewer".to_string(),
-            width: WIDTH as f32,
-            height: HEIGHT as f32,
+            width: WIDTH,
+            height: HEIGHT,
             resizable: false,
             ..Default::default()
         })
@@ -52,6 +51,7 @@ fn main() {
         .add_startup_system(setup)
         .add_system(update_bullet_system)
         .add_system(despwan_bullet_system)
+        .add_system(update_ship_system)
         .run();
 }
 
@@ -96,6 +96,15 @@ fn setup(bml_server: Res<BulletMLServer>, mut commands: Commands) {
             ..Default::default()
         })
         .insert(Ship);
+}
+
+fn update_ship_system(windows: Res<Windows>, mut query: Query<&mut Transform, With<Ship>>) {
+    let window = windows.get_primary().unwrap();
+    if let Some(position) = window.cursor_position() {
+        let mut ship_transform = query.single_mut();
+        ship_transform.translation =
+            Vec3::new(position.x - WIDTH / 2., position.y - HEIGHT / 2., 0.);
+    }
 }
 
 fn update_bullet_system(
