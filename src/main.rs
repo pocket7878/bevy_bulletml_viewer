@@ -33,7 +33,9 @@ fn main() {
     let bml_file = &args[1];
 
     let mut bml_server = BulletMLServer::new();
-    bml_server.load_file("sample", bml_file).unwrap();
+    bml_server
+        .load_file_with_capacities("sample", bml_file, 256, 256)
+        .unwrap();
     let top_data = BulletMLViewerRunnerData { turn: 0 };
 
     App::new()
@@ -59,6 +61,20 @@ fn setup(bml_server: Res<BulletMLServer>, mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
     commands.spawn_bundle(UiCameraBundle::default());
     /* Spawn enemy */
+    commands.spawn_bundle(SpriteBundle {
+        transform: Transform {
+            translation: *ENEMY_POSITION,
+            scale: Vec3::new(10.0, 10.0, 10.0),
+            ..Default::default()
+        },
+        sprite: Sprite {
+            color: Color::rgb(1.0, 0.0, 0.0),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+
+    // Bullet
     let runner = Runner::new(BulletMLViewerRunner, bml_server.get("sample").unwrap());
     commands
         .spawn_bundle(SpriteBundle {
@@ -143,9 +159,9 @@ fn update_bullet_system(
 
 fn despwan_bullet_system(
     mut commands: Commands,
-    query: Query<(Entity, &Transform, &BulletType), With<Bullet>>,
+    query: Query<(Entity, &Bullet, &Transform, &BulletType)>,
 ) {
-    for (entity, transform, bullet_type) in query.iter() {
+    for (entity, bullet, transform, bullet_type) in query.iter() {
         match *bullet_type {
             BulletType::Simple => {
                 if outside_check(&transform.translation) {
@@ -153,7 +169,7 @@ fn despwan_bullet_system(
                 }
             }
             BulletType::WithRunner(ref runner) => {
-                if outside_check(&transform.translation) && runner.is_end() {
+                if (outside_check(&transform.translation) || bullet.vanished) && runner.is_end() {
                     commands.entity(entity).despawn();
                 }
             }
